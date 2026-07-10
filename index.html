@@ -418,6 +418,12 @@
   .field input, .field select { padding: 12px 14px; border: 1px solid var(--gray-3); border-radius: var(--radius-sm); font-family: var(--f-body); font-size: 14px; color: var(--ink); background: var(--white); outline: none; transition: border-color 0.15s, box-shadow 0.15s; letter-spacing: -0.01em; appearance: auto; }
   .field input:focus, .field select:focus { border-color: var(--wa); box-shadow: 0 0 0 3px rgba(37,211,102,0.1); }
   .field select:invalid { color: var(--muted-2); }
+  .phone-group { display: flex; gap: 8px; }
+  .phone-group .ddd-input { width: 56px; text-align: center; flex-shrink: 0; }
+  .phone-group .number-input { flex: 1; min-width: 0; }
+  .field-error { display: none; font-size: 12px; color: #B42318; margin-top: 2px; letter-spacing: -0.01em; }
+  .field.has-error input { border-color: #B42318; }
+  .field.has-error .field-error { display: block; }
   .gate-submit { width: 100%; margin-top: 8px; background: var(--grad-dark); color: var(--white); font-family: var(--f-body); font-size: 15px; font-weight: 500; padding: 14px; border: none; border-radius: 999px; cursor: pointer; box-shadow: var(--sh-cta); transition: transform 0.2s; letter-spacing: -0.01em; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .gate-submit:hover { transform: translateY(-1px); }
   .gate-privacy { font-size: 11.5px; color: var(--muted-2); text-align: center; margin-top: 14px; letter-spacing: -0.01em; }
@@ -623,11 +629,15 @@
           <div class="field-row">
             <div class="field">
               <label for="gf-email">E-mail Corporativo*</label>
-              <input type="email" id="gf-email" name="email" required>
+              <input type="email" id="gf-email" name="email" placeholder="seunome@suaempresa.com.br" required>
+              <span class="field-error" id="gf-email-error">Use seu e-mail corporativo (ex: seunome@suaempresa.com.br)</span>
             </div>
             <div class="field">
-              <label for="gf-phone">WhatsApp*</label>
-              <input type="tel" id="gf-phone" name="phone" placeholder="+55 11 99999-9999" required>
+              <label for="gf-ddd">WhatsApp*</label>
+              <div class="phone-group">
+                <input type="tel" id="gf-ddd" class="ddd-input" placeholder="11" maxlength="2" inputmode="numeric" aria-label="DDD" required>
+                <input type="tel" id="gf-phone-number" class="number-input" placeholder="99999-9999" maxlength="10" inputmode="numeric" aria-label="Número" required>
+              </div>
             </div>
           </div>
           <div class="field-row">
@@ -1149,6 +1159,49 @@
     }
   });
 
+  // Bloqueia e-mails pessoais/gratuitos — exige e-mail corporativo
+  var FREE_EMAIL_DOMAINS = [
+    'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.com.br',
+    'outlook.com', 'outlook.com.br', 'live.com', 'live.com.br',
+    'yahoo.com', 'yahoo.com.br', 'icloud.com', 'me.com', 'aol.com',
+    'msn.com', 'bol.com.br', 'uol.com.br', 'ig.com.br', 'terra.com.br',
+    'zipmail.com.br', 'protonmail.com', 'gmx.com', 'r7.com'
+  ];
+  function isFreeEmail(email) {
+    var parts = email.toLowerCase().split('@');
+    if (parts.length !== 2) return false;
+    return FREE_EMAIL_DOMAINS.indexOf(parts[1].trim()) !== -1;
+  }
+  var emailInput = document.getElementById('gf-email');
+  if (emailInput) {
+    emailInput.addEventListener('blur', function () {
+      var field = emailInput.closest('.field');
+      if (emailInput.value && isFreeEmail(emailInput.value)) {
+        field.classList.add('has-error');
+      } else {
+        field.classList.remove('has-error');
+      }
+    });
+    emailInput.addEventListener('input', function () {
+      emailInput.closest('.field').classList.remove('has-error');
+    });
+  }
+
+  // DDD e número só aceitam dígitos, com um traço automático no número
+  var dddInput = document.getElementById('gf-ddd');
+  var numberInput = document.getElementById('gf-phone-number');
+  if (dddInput) {
+    dddInput.addEventListener('input', function () {
+      dddInput.value = dddInput.value.replace(/\D/g, '').slice(0, 2);
+    });
+  }
+  if (numberInput) {
+    numberInput.addEventListener('input', function () {
+      var digits = numberInput.value.replace(/\D/g, '').slice(0, 9);
+      numberInput.value = digits.length > 5 ? digits.slice(0, digits.length - 4) + '-' + digits.slice(-4) : digits;
+    });
+  }
+
   // Mecanismo principal: formulário próprio, enviado direto pra planilha do Google Sheets (via Apps Script)
   var GOOGLE_SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwXfNod74QlryeqQHImEZAEvllVXpo7VK1VqNOLw-XnPWTKmly9CVru-SPMC-5rVVBP/exec';
   var gateForm = document.getElementById('customGateForm');
@@ -1159,17 +1212,26 @@
         gateForm.reportValidity();
         return;
       }
+      if (isFreeEmail(emailInput.value)) {
+        emailInput.closest('.field').classList.add('has-error');
+        emailInput.focus();
+        return;
+      }
       var btn = document.getElementById('gfSubmitBtn');
       var errorMsg = document.getElementById('gf-error');
       errorMsg.style.display = 'none';
       btn.disabled = true;
       btn.textContent = 'Enviando...';
 
+      var ddd = dddInput.value.replace(/\D/g, '');
+      var number = numberInput.value.replace(/\D/g, '');
+      var fullPhone = '+55 ' + ddd + ' ' + number;
+
       var payload = {
         firstname: document.getElementById('gf-firstname').value,
         lastname: document.getElementById('gf-lastname').value,
-        email: document.getElementById('gf-email').value,
-        phone: document.getElementById('gf-phone').value,
+        email: emailInput.value,
+        phone: fullPhone,
         company: document.getElementById('gf-company').value,
         company_size: document.getElementById('gf-companysize').value
       };
