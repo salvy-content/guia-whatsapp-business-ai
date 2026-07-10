@@ -412,9 +412,12 @@
   .gate-eyebrow svg { width: 12px; height: 12px; }
   .gate-title { font-family: var(--f-display); font-size: 20px; font-weight: 500; color: var(--ink-2); line-height: 1.3; letter-spacing: -0.03em; margin-bottom: 22px; }
   .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 13px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
   .field label { font-size: 12.5px; font-weight: 500; color: var(--ink-2); letter-spacing: -0.01em; }
-  .field input { padding: 12px 14px; border: 1px solid var(--gray-3); border-radius: var(--radius-sm); font-family: var(--f-body); font-size: 14px; color: var(--ink); background: var(--white); outline: none; transition: border-color 0.15s, box-shadow 0.15s; letter-spacing: -0.01em; }
-  .field input:focus { border-color: var(--wa); box-shadow: 0 0 0 3px rgba(37,211,102,0.1); }
+  .field input, .field select { padding: 12px 14px; border: 1px solid var(--gray-3); border-radius: var(--radius-sm); font-family: var(--f-body); font-size: 14px; color: var(--ink); background: var(--white); outline: none; transition: border-color 0.15s, box-shadow 0.15s; letter-spacing: -0.01em; appearance: auto; }
+  .field input:focus, .field select:focus { border-color: var(--wa); box-shadow: 0 0 0 3px rgba(37,211,102,0.1); }
+  .field select:invalid { color: var(--muted-2); }
   .gate-submit { width: 100%; margin-top: 8px; background: var(--grad-dark); color: var(--white); font-family: var(--f-body); font-size: 15px; font-weight: 500; padding: 14px; border: none; border-radius: 999px; cursor: pointer; box-shadow: var(--sh-cta); transition: transform 0.2s; letter-spacing: -0.01em; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .gate-submit:hover { transform: translateY(-1px); }
   .gate-privacy { font-size: 11.5px; color: var(--muted-2); text-align: center; margin-top: 14px; letter-spacing: -0.01em; }
@@ -606,25 +609,46 @@
         <span class="gate-eyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Acesso liberado na hora</span>
         <h3 class="gate-title">Preencha para acessar</h3>
 
-        <div id="hubspot-form-target"></div>
-        <script src="https://js.hsforms.net/forms/v2.js"></script>
-        <script>
-          // Aguarda o script do HubSpot carregar antes de criar o form.
-          // (o guard "if (window.hbspt)" antigo falhava quando o v2.js
-          //  ainda não tinha carregado no momento em que rodava.)
-          (function initHubspotForm() {
-            if (!window.hbspt || !window.hbspt.forms) {
-              return void setTimeout(initHubspotForm, 100);
-            }
-            hbspt.forms.create({
-              region: "na1",
-              portalId: "50449232",
-              formId: "24c4e2c7-842f-42e7-aae2-3d281101aa44",
-              target: "#hubspot-form-target",
-              onFormSubmitted: function () { unlockContent(); }
-            });
-          })();
-        </script>
+        <form id="customGateForm" novalidate>
+          <div class="field-row">
+            <div class="field">
+              <label for="gf-firstname">Nome*</label>
+              <input type="text" id="gf-firstname" name="firstname" required>
+            </div>
+            <div class="field">
+              <label for="gf-lastname">Sobrenome</label>
+              <input type="text" id="gf-lastname" name="lastname">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="gf-email">E-mail Corporativo*</label>
+              <input type="email" id="gf-email" name="email" required>
+            </div>
+            <div class="field">
+              <label for="gf-phone">WhatsApp*</label>
+              <input type="tel" id="gf-phone" name="phone" placeholder="+55 11 99999-9999" required>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="gf-company">Empresa:*</label>
+              <input type="text" id="gf-company" name="company" required>
+            </div>
+            <div class="field">
+              <label for="gf-companysize">Tamanho da empresa*</label>
+              <select id="gf-companysize" name="company_size" required>
+                <option value="" disabled selected></option>
+                <option value="1">1</option>
+                <option value="2 - 10">2 - 10</option>
+                <option value="11 - 50">11 - 50</option>
+                <option value="51 - 200">51 - 200</option>
+              </select>
+            </div>
+          </div>
+          <p id="gf-error" style="display:none; color:#B42318; font-size:13px; margin-bottom:10px;">Não foi possível enviar. Confira os campos e tente novamente.</p>
+          <button type="submit" class="gate-submit" id="gfSubmitBtn">Enviar</button>
+        </form>
         <p class="gate-privacy">Seus dados estão seguros e não são compartilhados com terceiros.</p>
       </div>
 
@@ -1109,14 +1133,68 @@
   }
   try { if (localStorage.getItem('salvy_guide_unlocked')==='1') unlockContent(); } catch(e){}
 
-  // Backup: libera o conteúdo quando o HubSpot avisa que o envio foi CONCLUÍDO.
-  // (usamos só 'onFormSubmitted' — 'onFormSubmit' dispara antes de terminar.)
+  // Mecanismo principal: o HubSpot redireciona pra própria página com ?liberado=1 após o envio
+  try {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('liberado') === '1') {
+      unlockContent();
+    }
+  } catch (e) {}
+
+  // Bônus: libera também se o embed do HubSpot avisar via postMessage (quando o navegador permitir)
   window.addEventListener('message', function (event) {
     if (!event.data || event.data.type !== 'hsFormCallback') return;
-    if (event.data.eventName === 'onFormSubmitted') {
+    if (event.data.eventName === 'onFormSubmitted' || event.data.eventName === 'onFormSubmit') {
       unlockContent();
     }
   });
+
+  // Mecanismo principal: formulário próprio, enviado direto pra planilha do Google Sheets (via Apps Script)
+  var GOOGLE_SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwXfNod74QlryeqQHImEZAEvllVXpo7VK1VqNOLw-XnPWTKmly9CVru-SPMC-5rVVBP/exec';
+  var gateForm = document.getElementById('customGateForm');
+  if (gateForm) {
+    gateForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!gateForm.checkValidity()) {
+        gateForm.reportValidity();
+        return;
+      }
+      var btn = document.getElementById('gfSubmitBtn');
+      var errorMsg = document.getElementById('gf-error');
+      errorMsg.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      var payload = {
+        firstname: document.getElementById('gf-firstname').value,
+        lastname: document.getElementById('gf-lastname').value,
+        email: document.getElementById('gf-email').value,
+        phone: document.getElementById('gf-phone').value,
+        company: document.getElementById('gf-company').value,
+        company_size: document.getElementById('gf-companysize').value
+      };
+
+      // mode: 'no-cors' + Content-Type: text/plain evita o preflight do CORS,
+      // que o Apps Script não responde direito. A resposta fica opaca (não dá
+      // pra ler o status), então tratamos o envio como sucesso se a promise
+      // resolver — só cai no catch em falha real de rede (ex: sem internet).
+      fetch(GOOGLE_SHEETS_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      })
+        .then(function () {
+          unlockContent();
+        })
+        .catch(function (err) {
+          console.error('Erro ao enviar formulário:', err);
+          btn.disabled = false;
+          btn.textContent = 'Enviar';
+          errorMsg.style.display = 'block';
+        });
+    });
+  }
 </script>
 
 <script>
