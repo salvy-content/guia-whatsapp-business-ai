@@ -609,7 +609,13 @@
         <div id="hubspot-form-target"></div>
         <script src="https://js.hsforms.net/forms/v2.js"></script>
         <script>
-          if (window.hbspt) {
+          // Aguarda o script do HubSpot carregar antes de criar o form.
+          // (o guard "if (window.hbspt)" antigo falhava quando o v2.js
+          //  ainda não tinha carregado no momento em que rodava.)
+          (function initHubspotForm() {
+            if (!window.hbspt || !window.hbspt.forms) {
+              return void setTimeout(initHubspotForm, 100);
+            }
             hbspt.forms.create({
               region: "na1",
               portalId: "50449232",
@@ -617,7 +623,7 @@
               target: "#hubspot-form-target",
               onFormSubmitted: function () { unlockContent(); }
             });
-          }
+          })();
         </script>
         <p class="gate-privacy">Seus dados estão seguros e não são compartilhados com terceiros.</p>
       </div>
@@ -1103,10 +1109,11 @@
   }
   try { if (localStorage.getItem('salvy_guide_unlocked')==='1') unlockContent(); } catch(e){}
 
-  // Libera o conteúdo quando o form embed do HubSpot é enviado
+  // Backup: libera o conteúdo quando o HubSpot avisa que o envio foi CONCLUÍDO.
+  // (usamos só 'onFormSubmitted' — 'onFormSubmit' dispara antes de terminar.)
   window.addEventListener('message', function (event) {
     if (!event.data || event.data.type !== 'hsFormCallback') return;
-    if (event.data.eventName === 'onFormSubmitted' || event.data.eventName === 'onFormSubmit') {
+    if (event.data.eventName === 'onFormSubmitted') {
       unlockContent();
     }
   });
