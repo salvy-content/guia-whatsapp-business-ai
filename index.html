@@ -656,6 +656,11 @@
               </select>
             </div>
           </div>
+          <input type="hidden" id="gf-utm-source" name="utm_source">
+          <input type="hidden" id="gf-utm-medium" name="utm_medium">
+          <input type="hidden" id="gf-utm-campaign" name="utm_campaign">
+          <input type="hidden" id="gf-utm-content" name="utm_content">
+          <input type="hidden" id="gf-utm-term" name="utm_term">
           <p id="gf-error" style="display:none; color:#B42318; font-size:13px; margin-bottom:10px;">Não foi possível enviar. Confira os campos e tente novamente.</p>
           <button type="submit" class="gate-submit" id="gfSubmitBtn">Enviar</button>
         </form>
@@ -1202,6 +1207,20 @@
     });
   }
 
+  // Captura os parâmetros de UTM da URL e guarda nos campos ocultos do formulário
+  (function () {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      utmKeys.forEach(function (key) {
+        var field = document.getElementById('gf-' + key.replace('utm_', 'utm-'));
+        if (field && params.get(key)) {
+          field.value = params.get(key);
+        }
+      });
+    } catch (e) {}
+  })();
+
   // Mecanismo principal: formulário próprio, enviado direto pra planilha do Google Sheets (via Apps Script)
   var GOOGLE_SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwXfNod74QlryeqQHImEZAEvllVXpo7VK1VqNOLw-XnPWTKmly9CVru-SPMC-5rVVBP/exec';
   var gateForm = document.getElementById('customGateForm');
@@ -1233,7 +1252,12 @@
         email: emailInput.value,
         phone: fullPhone,
         company: document.getElementById('gf-company').value,
-        company_size: document.getElementById('gf-companysize').value
+        company_size: document.getElementById('gf-companysize').value,
+        utm_source: document.getElementById('gf-utm-source').value,
+        utm_medium: document.getElementById('gf-utm-medium').value,
+        utm_campaign: document.getElementById('gf-utm-campaign').value,
+        utm_content: document.getElementById('gf-utm-content').value,
+        utm_term: document.getElementById('gf-utm-term').value
       };
 
       // mode: 'no-cors' + Content-Type: text/plain evita o preflight do CORS,
