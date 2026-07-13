@@ -425,6 +425,33 @@
   .field-error { display: none; font-size: 12px; color: #B42318; margin-top: 2px; letter-spacing: -0.01em; }
   .field.has-error input { border-color: #B42318; }
   .field.has-error .field-error { display: block; }
+
+  /* ── CUSTOM SELECT (tamanho da empresa) ── */
+  .custom-select { position: relative; }
+  .custom-select-btn {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 14px; border: 1px solid var(--gray-3); border-radius: var(--radius-sm);
+    font-family: var(--f-body); font-size: 14px; color: var(--ink); background: var(--white);
+    outline: none; cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s;
+    letter-spacing: -0.01em;
+  }
+  .custom-select-btn:focus, .custom-select-btn.open { border-color: var(--wa); box-shadow: 0 0 0 3px rgba(37,211,102,0.1); }
+  .custom-select-label.placeholder { color: var(--muted-2); }
+  .custom-select-chevron { width: 16px; height: 16px; flex-shrink: 0; color: var(--muted); transition: transform 0.15s; }
+  .custom-select-btn.open .custom-select-chevron { transform: rotate(180deg); }
+  .field.has-error .custom-select-btn { border-color: #B42318; }
+  .custom-select-list {
+    list-style: none; position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+    background: var(--white); border: 1px solid var(--gray-3); border-radius: var(--radius-sm);
+    box-shadow: var(--sh-card-hov); max-height: 220px; overflow-y: auto; display: none; padding: 6px;
+  }
+  .custom-select-list.open { display: block; }
+  .custom-select-list li {
+    padding: 9px 10px; font-size: 14px; color: var(--ink); border-radius: 8px; cursor: pointer;
+    letter-spacing: -0.01em;
+  }
+  .custom-select-list li:hover, .custom-select-list li.highlighted { background: var(--gray-2); }
+  .custom-select-list li.selected { color: var(--wa-deep); font-weight: 500; }
   .gate-submit { width: 100%; margin-top: 8px; background: var(--grad-dark); color: var(--white); font-family: var(--f-body); font-size: 15px; font-weight: 500; padding: 14px; border: none; border-radius: 999px; cursor: pointer; box-shadow: var(--sh-cta); transition: transform 0.2s; letter-spacing: -0.01em; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
   .gate-submit:hover { transform: translateY(-1px); }
   .gate-privacy { font-size: 11.5px; color: var(--muted-2); text-align: center; margin-top: 14px; letter-spacing: -0.01em; }
@@ -647,17 +674,23 @@
               <input type="text" id="gf-company" name="company" required>
             </div>
             <div class="field">
-              <label for="gf-companysize">Tamanho da empresa*</label>
-              <select id="gf-companysize" name="company_size" required>
-                <option value="" disabled selected></option>
-                <option value="1">1</option>
-                <option value="2 - 10">2 - 10</option>
-                <option value="11 - 50">11 - 50</option>
-                <option value="51 - 200">51 - 200</option>
-                <option value="201 - 1.000">201 - 1.000</option>
-                <option value="Acima de 1.000">Acima de 1.000</option>
-                <option value="Não possuo empresa">Não possuo empresa</option>
-              </select>
+              <label for="gf-companysize-btn">Tamanho da empresa*</label>
+              <div class="custom-select" id="gf-companysize-wrap">
+                <button type="button" class="custom-select-btn" id="gf-companysize-btn" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="custom-select-label placeholder" id="gf-companysize-label">Selecione</span>
+                  <svg class="custom-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <ul class="custom-select-list" id="gf-companysize-list" role="listbox" tabindex="-1" aria-label="Tamanho da empresa">
+                  <li role="option" data-value="1">1</li>
+                  <li role="option" data-value="2 - 10">2 - 10</li>
+                  <li role="option" data-value="11 - 50">11 - 50</li>
+                  <li role="option" data-value="51 - 200">51 - 200</li>
+                  <li role="option" data-value="201 - 1.000">201 - 1.000</li>
+                  <li role="option" data-value="Acima de 1.000">Acima de 1.000</li>
+                  <li role="option" data-value="Não possuo empresa">Não possuo empresa</li>
+                </ul>
+                <input type="hidden" id="gf-companysize" name="company_size" value="">
+              </div>
             </div>
           </div>
           <input type="hidden" id="gf-utm-source" name="utm_source">
@@ -1141,6 +1174,82 @@
 
 
 <script>
+  // Dropdown customizado de "Tamanho da empresa" — substitui o <select> nativo
+  // porque o popup nativo pode falhar ao abrir quando a página roda dentro de
+  // um iframe (embed no Framer), mesmo com o campo focado (dá pra navegar por teclado
+  // mas o menu não aparece visualmente). Esse dropdown é 100% desenhado em HTML/CSS,
+  // então abre sempre, independente do navegador ou do contexto de iframe.
+  (function () {
+    var wrap = document.getElementById('gf-companysize-wrap');
+    if (!wrap) return;
+    var btn = document.getElementById('gf-companysize-btn');
+    var label = document.getElementById('gf-companysize-label');
+    var list = document.getElementById('gf-companysize-list');
+    var hiddenInput = document.getElementById('gf-companysize');
+    var options = Array.prototype.slice.call(list.querySelectorAll('li'));
+    var highlightedIndex = -1;
+
+    function closeList() {
+      list.classList.remove('open');
+      btn.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    function openList() {
+      list.classList.add('open');
+      btn.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      var selected = options.findIndex(function (o) { return o.classList.contains('selected'); });
+      setHighlight(selected >= 0 ? selected : 0);
+    }
+    function setHighlight(idx) {
+      options.forEach(function (o) { o.classList.remove('highlighted'); });
+      if (idx >= 0 && idx < options.length) {
+        options[idx].classList.add('highlighted');
+        options[idx].scrollIntoView({ block: 'nearest' });
+        highlightedIndex = idx;
+      }
+    }
+    function selectOption(opt) {
+      options.forEach(function (o) { o.classList.remove('selected'); });
+      opt.classList.add('selected');
+      label.textContent = opt.textContent;
+      label.classList.remove('placeholder');
+      hiddenInput.value = opt.getAttribute('data-value');
+      wrap.closest('.field').classList.remove('has-error');
+      closeList();
+      btn.focus();
+    }
+
+    btn.addEventListener('click', function () {
+      if (list.classList.contains('open')) { closeList(); } else { openList(); }
+    });
+    options.forEach(function (opt, idx) {
+      opt.addEventListener('click', function () { selectOption(opt); });
+      opt.addEventListener('mouseenter', function () { setHighlight(idx); });
+    });
+    document.addEventListener('click', function (e) {
+      if (!wrap.contains(e.target)) closeList();
+    });
+    btn.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!list.classList.contains('open')) { openList(); return; }
+        var next = e.key === 'ArrowDown' ? highlightedIndex + 1 : highlightedIndex - 1;
+        next = Math.max(0, Math.min(options.length - 1, next));
+        setHighlight(next);
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (list.classList.contains('open') && highlightedIndex >= 0) {
+          selectOption(options[highlightedIndex]);
+        } else {
+          openList();
+        }
+      } else if (e.key === 'Escape') {
+        closeList();
+      }
+    });
+  })();
+
   function unlockContent() {
     document.getElementById('lock-overlay').classList.add('hidden');
     var inner = document.getElementById('content-inner');
@@ -1244,6 +1353,33 @@
     } catch (e) {}
   })();
 
+  // Propaga a mesma UTM pros links dos banners e do CTA final que apontam pro
+  // site/app da Salvy — sem isso, quem clica sai da página e perde a origem
+  // da campanha (o link ficava sempre "limpo", sem a UTM da visita).
+  (function () {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+      var utmPairs = [];
+      utmKeys.forEach(function (key) {
+        var val = params.get(key);
+        if (val) utmPairs.push([key, val]);
+      });
+      if (utmPairs.length === 0) return;
+
+      var links = document.querySelectorAll('a[href^="https://salvy.com.br"], a[href^="https://app.salvy.com.br"]');
+      links.forEach(function (link) {
+        try {
+          var url = new URL(link.getAttribute('href'), window.location.href);
+          utmPairs.forEach(function (pair) {
+            if (!url.searchParams.has(pair[0])) url.searchParams.set(pair[0], pair[1]);
+          });
+          link.setAttribute('href', url.toString());
+        } catch (e) {}
+      });
+    } catch (e) {}
+  })();
+
   // Mecanismo principal: formulário próprio, enviado direto pra planilha do Google Sheets (via Apps Script)
   var GOOGLE_SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwXfNod74QlryeqQHImEZAEvllVXpo7VK1VqNOLw-XnPWTKmly9CVru-SPMC-5rVVBP/exec';
   var gateForm = document.getElementById('customGateForm');
@@ -1252,6 +1388,12 @@
       e.preventDefault();
       if (!gateForm.checkValidity()) {
         gateForm.reportValidity();
+        return;
+      }
+      var companySizeInput = document.getElementById('gf-companysize');
+      if (!companySizeInput.value) {
+        document.getElementById('gf-companysize-wrap').closest('.field').classList.add('has-error');
+        document.getElementById('gf-companysize-btn').focus();
         return;
       }
       if (isFreeEmail(emailInput.value)) {
