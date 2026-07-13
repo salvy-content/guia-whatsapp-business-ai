@@ -156,10 +156,11 @@
     padding: 16px 28px; border-top: 1px solid var(--gray-2); background: var(--gray-1);
   }
   @media (max-width: 600px) { .cp-footer { padding: 14px 20px; } }
-  .pm-save-btn {
-    background: var(--grad-dark); color: var(--white); text-align: center;
-    padding: 9px 22px; border-radius: 999px; font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
+  .pm-save-status {
+    display: inline-flex; align-items: center; gap: 7px;
+    color: var(--muted); font-size: 12.5px; letter-spacing: -0.01em;
   }
+  .pm-save-status svg { width: 14px; height: 14px; color: var(--wa-deep); flex-shrink: 0; }
 
   /* bubble de exemplo (usado no card "Sua IA" da seção Meta Business Agent) */
   .bubble { max-width: 78%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 1px rgba(0,0,0,0.06); }
@@ -538,7 +539,7 @@
     <h1 class="hero-title">Como automatizar o <span class="accent">atendimento</span> no WhatsApp Business</h1>
     <p class="hero-desc">Do Meta Business Agent à API oficial da Meta. Reunimos tudo o que sua empresa precisa saber para gerar mais resultados no aplicativo usado por milhões de brasileiros.</p>
     <div class="hero-cta-row">
-      <a href="#gate" class="btn-primary">
+      <a href="#gate" class="btn-primary" id="heroCtaBtn">
         <span class="arrow-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
         Quero o guia gratuito
       </a>
@@ -588,7 +589,7 @@
           </div>
         </div>
         <div class="cp-footer">
-          <div class="pm-save-btn">Salvar configuração</div>
+          <div class="pm-save-status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Configuração salva automaticamente</div>
         </div>
       </div>
     </div>
@@ -653,6 +654,9 @@
                 <option value="2 - 10">2 - 10</option>
                 <option value="11 - 50">11 - 50</option>
                 <option value="51 - 200">51 - 200</option>
+                <option value="201 - 1.000">201 - 1.000</option>
+                <option value="Acima de 1.000">Acima de 1.000</option>
+                <option value="Não possuo empresa">Não possuo empresa</option>
               </select>
             </div>
           </div>
@@ -1204,6 +1208,25 @@
     numberInput.addEventListener('input', function () {
       var digits = numberInput.value.replace(/\D/g, '').slice(0, 9);
       numberInput.value = digits.length > 5 ? digits.slice(0, digits.length - 4) + '-' + digits.slice(-4) : digits;
+    });
+  }
+
+  // Botão "Quero o guia gratuito": rola até o formulário. Funciona tanto se o
+  // iframe tiver scroll próprio (rolagem normal) quanto se for "altura automática"
+  // sem scroll interno (aí avisa a página de fora, via postMessage, pra ela rolar)
+  var heroCtaBtn = document.getElementById('heroCtaBtn');
+  if (heroCtaBtn) {
+    heroCtaBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      var target = document.getElementById('gate');
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try {
+        window.parent.postMessage({
+          type: 'salvyScrollTo',
+          offset: target.getBoundingClientRect().top + window.pageYOffset
+        }, '*');
+      } catch (e) {}
     });
   }
 
